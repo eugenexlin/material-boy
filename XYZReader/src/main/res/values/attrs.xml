@@ -2,4 +2,9 @@
     <declare-styleable name="DrawInsetsFrameLayout">
         <attr name="insetBackground" format="color|reference" />
     </declare-styleable>
+
+    <declare-styleable name="RatioFrameLayout">
+        <attr name="heightFromWidthMultiplier" />
+    </declare-styleable>
+
 </resources>

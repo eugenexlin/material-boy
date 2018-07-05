@@ -230,7 +230,6 @@ public class ArticleDetailFragment extends Fragment implements
     }
 
     private void bindViews() {
-//        if(1 == 1 ) return;
         if (mRootView == null) {
             return;
         }
@@ -244,9 +243,9 @@ public class ArticleDetailFragment extends Fragment implements
         bodyView.setTypeface(Typeface.createFromAsset(getResources().getAssets(), "Rosario-Regular.ttf"));
 
         if (mCursor != null) {
-//            mRootView.setAlpha(0);
-//            mRootView.setVisibility(View.VISIBLE);
-//            mRootView.animate().alpha(1);
+            mRootView.setAlpha(0);
+            mRootView.setVisibility(View.VISIBLE);
+            mRootView.animate().alpha(1);
             titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
             mPhotoView.setTransitionName(mCursor.getString(ArticleLoader.Query.TITLE));
 
@@ -270,6 +269,32 @@ public class ArticleDetailFragment extends Fragment implements
 
             }
 //            bodyView.setText(Html.fromHtml(mCursor.getString(ArticleLoader.Query.BODY).replaceAll("(\r\n|\n)", "<br />")));
+
+            bodyView.setText(
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "THIS IS A TEST\n" +
+                    "");
 
             final Target imageTarget = new Target() {
                 @Override
@@ -302,7 +327,7 @@ public class ArticleDetailFragment extends Fragment implements
                     .into(imageTarget);
 
         } else {
-            //mRootView.setVisibility(View.GONE);
+            mRootView.setVisibility(View.GONE);
             titleView.setText("N/A");
             bylineView.setText("N/A" );
             bodyView.setText("N/A");
@@ -330,8 +355,7 @@ public class ArticleDetailFragment extends Fragment implements
         if (mPhotoView.getLocalVisibleRect(scrollBounds)){
             return mPhotoView;
         }
-        //TODO WHY IS THIS NOT WORKING
-        return mPhotoView;
+        return null;
     }
 
     @Override
