@@ -9,13 +9,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.Loader;
 import android.database.Cursor;
-import android.media.tv.TvContract;
 import android.os.Bundle;
 import android.app.SharedElementCallback;
 import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.v4.view.ViewCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.app.ActionBarActivity;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.support.v7.widget.Toolbar;
@@ -25,8 +23,11 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.example.xyzreader.R;
@@ -54,6 +55,8 @@ import java.util.Map;
 public class ArticleListActivity extends Activity implements
         LoaderManager.LoaderCallbacks<Cursor> {
 
+    private final static int LOADER_ID = 626;
+
     private static final String TAG = ArticleListActivity.class.toString();
     private Toolbar mToolbar;
     private CollapsingToolbarLayout mCTL;
@@ -61,6 +64,8 @@ public class ArticleListActivity extends Activity implements
     private RecyclerView mRecyclerView;
 //    private ProgressBar mLoading;
     private ArticleListActivity mActivity;
+
+    private boolean mLoading = false;
 
     private Bundle mReenterState;
 
@@ -133,14 +138,12 @@ public class ArticleListActivity extends Activity implements
         });
 
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-        getLoaderManager().initLoader(0, null, this);
+        getLoaderManager().initLoader(LOADER_ID, null, this);
 
         if (savedInstanceState == null) {
-            refresh();
+//            refresh();
         }
     }
-
-
 
     @Override
     public void onActivityReenter(int resultCode, Intent data) {
@@ -165,6 +168,9 @@ public class ArticleListActivity extends Activity implements
 
     private void refresh() {
 //        mLoading.setVisibility(View.VISIBLE);
+        mLoading = true;
+        mRecyclerView.removeAllViews();
+        mRecyclerView.invalidate();
         startService(new Intent(this, UpdaterService.class));
     }
 
@@ -212,7 +218,7 @@ public class ArticleListActivity extends Activity implements
                 new StaggeredGridLayoutManager(columnCount, StaggeredGridLayoutManager.VERTICAL);
         mRecyclerView.setLayoutManager(sglm);
 
-//        mLoading.setVisibility(View.GONE);
+        mLoading = false;
     }
 
     @Override
@@ -222,6 +228,14 @@ public class ArticleListActivity extends Activity implements
 
     private class Adapter extends RecyclerView.Adapter<ViewHolder> {
         private Cursor mCursor;
+
+        private int lastPosition = -1;
+
+        // artificial make sure we have no more than 1 animation per 200 ms
+        private long lastAnimationTime = System.currentTimeMillis();
+        private static final int animationDelayMs = 100;
+        private final Interpolator interpolator =
+                new DecelerateInterpolator(1.5f);
 
         public Adapter(Cursor cursor) {
             mCursor = cursor;
@@ -242,6 +256,31 @@ public class ArticleListActivity extends Activity implements
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
             holder.bind(mCursor, position);
+            setAnimation(holder.itemView, position);
+        }
+
+        // from stack overflow
+        // animating here allows items to always animate after initial load
+        // and animate after refresh.
+        private void setAnimation(View viewToAnimate, int position)
+        {
+            // If the bound view wasn't previously displayed on screen, it's animated
+            if (position > lastPosition)
+            {
+                long currentTime = System.currentTimeMillis();
+                long nextAnimationTime = lastAnimationTime + animationDelayMs;
+                long actualAnimationTime = (nextAnimationTime > currentTime ? nextAnimationTime : currentTime);
+                System.out.println(actualAnimationTime);
+                Animation animation = AnimationUtils.loadAnimation(mActivity, R.anim.item_fall_in_anim);
+                lastAnimationTime = actualAnimationTime;
+                if (actualAnimationTime > currentTime){
+                    animation.setStartOffset(actualAnimationTime - currentTime);
+                }
+                animation.setInterpolator(interpolator);
+
+                viewToAnimate.startAnimation(animation);
+                lastPosition = position;
+            }
         }
 
         @Override
@@ -311,6 +350,10 @@ public class ArticleListActivity extends Activity implements
 
         @Override
         public void onClick(View v) {
+            if (mLoading){
+                return;
+            }
+//          getLoaderManager().getLoader(LOADER_ID).cancelLoad();
             String transitionName = ViewCompat.getTransitionName(thumbnailView);
             Intent intent = new Intent(ArticleListActivity.this, ArticleDetailActivity.class);
             intent.setData(ItemsContract.Items.buildItemUri(mId));

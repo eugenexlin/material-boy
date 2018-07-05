@@ -31,6 +31,7 @@
             android:paddingTop="16dp"
             android:paddingRight="16dp"
             android:paddingBottom="4dp"
+            android:textSize="@dimen/list_title_size"
             android:textColor="@color/primary_dark"
             android:ellipsize="end"
             android:maxLines="4" />
@@ -43,7 +44,8 @@
             android:paddingLeft="16dp"
             android:paddingRight="16dp"
             android:paddingBottom="16dp"
-            android:textColor="#6000"
+            android:textSize="@dimen/list_subtitle_size"
+            android:textColor="@color/secondary_text"
             android:maxLines="2"
             android:ellipsize="end" />
     </LinearLayout>

@@ -3,7 +3,7 @@
         <attr name="insetBackground" format="color|reference" />
     </declare-styleable>
 
-    <declare-styleable name="RatioFrameLayout">
+    <declare-styleable name="MaxScreenHeightFrameLayout">
         <attr name="heightFromWidthMultiplier" />
     </declare-styleable>
 
