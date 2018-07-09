@@ -1,6 +1,6 @@
 package com.example.xyzreader.ui;
 
-import android.app.Activity;
+import android.annotation.SuppressLint;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.LoaderManager;
@@ -11,15 +11,22 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.design.widget.AppBarLayout;
+import android.support.design.widget.CollapsingToolbarLayout;
+import android.support.design.widget.CoordinatorLayout;
+import android.support.design.widget.FloatingActionButton;
 import android.support.v13.app.FragmentStatePagerAdapter;
 import android.app.SharedElementCallback;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.transition.Transition;
+import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.widget.ImageView;
 
 
@@ -27,9 +34,13 @@ import android.widget.ImageView;
 import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
+import com.squareup.picasso.Picasso;
 
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 import static com.example.xyzreader.ui.ArticleListActivity.EXTRA_CURRENT_POSITION;
 import static com.example.xyzreader.ui.ArticleListActivity.EXTRA_STARTING_POSITION;
@@ -40,11 +51,16 @@ import static com.example.xyzreader.ui.ArticleListActivity.EXTRA_STARTING_POSITI
 public class ArticleDetailActivity extends AppCompatActivity
         implements LoaderManager.LoaderCallbacks<Cursor> {
 
+    static final String TEXT_SCROLL_POSITION = "TEXT_SCROLL_POSITION";
+
     private Cursor mCursor;
+
+    public HashMap<Long, Integer> IdToScrollY = new HashMap<>();
 
     //id of the entry, we will convert it to position as soon as cursor ready
     private long mStartId;
     private long mInitialId;
+    private boolean IsBarProbablyShowingPicture = true;
 
     private int mStartPosition;
     private int mSelectedPosition;
@@ -52,6 +68,12 @@ public class ArticleDetailActivity extends AppCompatActivity
     private long mSelectedItemId;
     private int mSelectedItemUpButtonFloor = Integer.MAX_VALUE;
     private int mTopInset;
+
+    FloatingActionButton mFAB;
+
+    public ImageView mBarPicture;
+
+    private AppBarLayout mAppBar;
 
     private ViewPager mPager;
     private MyPagerAdapter mPagerAdapter;
@@ -61,21 +83,51 @@ public class ArticleDetailActivity extends AppCompatActivity
     private ArticleDetailFragment mDetailFragment;
     private boolean isFinishTransition;
 
+    public boolean isEnterTransitionFinished;
+    // we delay the loading of text for 2 reasons
+    // loading the text on the page with shared element
+    // COMPLETELY SNUFFS OUT YOUR APP WITH NO EXPLANATION.
+    // next, for the viewpager pages not on main
+    // we need delay also to not do it during animation because
+    // it makes it choppy and ugly
+    private ArticleDetailFragment delayedTextLoadFragment;
+    public void signMeUpForDelayedTextLoad(ArticleDetailFragment frag){
+        delayedTextLoadFragment = frag;
+    }
+
+    private HashMap<Long, ArticleDetailFragment> mFragments = new HashMap<>();
+    public void addFragment(Long id, ArticleDetailFragment frag){
+        mFragments.put(id, frag);
+    }
+    public void removeFragment(Long id){
+        mFragments.remove(id);
+    }
+
     private final SharedElementCallback mCallback = new SharedElementCallback() {
         @Override
         public void onMapSharedElements(List<String> names, Map<String, View> sharedElements) {
 
             if (isFinishTransition) {
-                ImageView sharedElement = mDetailFragment.getImageView();
-                if (sharedElement == null) {
+                // TODO REMOVE THIS TO HAVE RE ENTER TRANSITION
+                // BUT IT WILL BE BUGGY FOR WEIRD OPEN GL REASONS I THINK.
+                // views flash or twitch for 1 frame.
+                // caused by large text existing on fragment.
+                boolean SKIP_REENTER_TRANSITION = true;
+                if (SKIP_REENTER_TRANSITION){
                     names.clear();
                     sharedElements.clear();
-                } else if (mStartPosition != mSelectedPosition) {
-                    names.clear();
-                    names.add(sharedElement.getTransitionName());
-                    sharedElements.clear();
-                    sharedElements.put(sharedElement.getTransitionName(), sharedElement);
+                    return;
                 }
+
+
+
+                names.clear();
+                sharedElements.clear();
+                if(!IsBarProbablyShowingPicture){
+                    return;
+                }
+                names.add(mBarPicture.getTransitionName());
+                sharedElements.put(mBarPicture.getTransitionName(), mBarPicture);
             }
         }
     };
@@ -93,22 +145,79 @@ public class ArticleDetailActivity extends AppCompatActivity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-                            View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-        }
+
         setContentView(R.layout.activity_article_detail);
         postponeEnterTransition();
         setEnterSharedElementCallback(mCallback);
+        getWindow().getSharedElementEnterTransition().addListener(new Transition.TransitionListener() {
+            @Override
+            public void onTransitionStart(Transition transition) {
+            }
+
+            @Override
+            public void onTransitionEnd(Transition transition) {
+                CoordinatorLayout.LayoutParams params = (CoordinatorLayout.LayoutParams) mAppBar.getLayoutParams();
+                AppBarLayout.Behavior behavior = (AppBarLayout.Behavior) params.getBehavior();
+                if(behavior!=null) {
+                    CoordinatorLayout clRoot = (CoordinatorLayout) findViewById(R.id.cl_root);
+                    behavior.onNestedFling(clRoot, mAppBar, null, 0, 0.05f, true);
+                }
+                isEnterTransitionFinished = true;
+
+                if (delayedTextLoadFragment != null){
+                    delayedTextLoadFragment.loadText();
+                }
+            }
+
+            @Override
+            public void onTransitionCancel(Transition transition) {
+            }
+
+            @Override
+            public void onTransitionPause(Transition transition) {
+            }
+
+            @Override
+            public void onTransitionResume(Transition transition) {
+            }
+        });
+
+        mBarPicture= (ImageView) findViewById(R.id.backdrop);
+
+        mFAB = (FloatingActionButton) findViewById(R.id.fab_share);
+
+        mAppBar = (AppBarLayout) findViewById(R.id.appbar);
+        mAppBar.addOnOffsetChangedListener(new AppBarLayout.OnOffsetChangedListener() {
+            @Override
+            public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
+//                IsBarProbablyShowingPicture =
+//                        (appBarLayout.getTotalScrollRange() + verticalOffset
+//                                >
+//                                320 );
+
+                if (verticalOffset == 0) {
+                    mFAB.hide();
+                }else{
+                    mFAB.show();
+                }
+
+                IsBarProbablyShowingPicture =
+                        (appBarLayout.getTotalScrollRange() + verticalOffset
+                                >
+                        appBarLayout.getTotalScrollRange()/2 );
+//                System.out.println(appBarLayout.getTotalScrollRange() + " " + verticalOffset);
+            }
+        });
 
         final Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setDisplayShowTitleEnabled(false);
 
         toolbar.setNavigationOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
                 onBackPressed();
             }
         });
@@ -128,12 +237,11 @@ public class ArticleDetailActivity extends AppCompatActivity
                 .applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, getResources().getDisplayMetrics()));
         mPager.setPageMarginDrawable(new ColorDrawable(0x22000000));
 
-
-        mPager.setOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+        mPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
             @Override
             public void onPageScrollStateChanged(int state) {
                 super.onPageScrollStateChanged(state);
-//                mUpButton.animate()
+//               mUpButton.animate()
 //                        .alpha((state == ViewPager.SCROLL_STATE_IDLE) ? 1f : 0f)
 //                        .setDuration(300);
             }
@@ -146,41 +254,55 @@ public class ArticleDetailActivity extends AppCompatActivity
 
                 mSelectedPosition = position;
                 mSelectedItemId = mCursor.getLong(ArticleLoader.Query._ID);
+
+                if (mFragments.containsKey(mSelectedItemId)){
+                    mFragments.get(mSelectedItemId).loadText();
+                }
+
+                mBarPicture.setTransitionName(mCursor.getString(ArticleLoader.Query.TITLE));
+                Picasso.with(ArticleDetailActivity.this)
+                        .load(mCursor.getString(ArticleLoader.Query.PHOTO_URL))
+                        .placeholder(R.drawable.empty_detail)
+                        .noFade()
+                        .into(mBarPicture);
 //                updateUpButtonPosition();
+
             }
         });
 
-//        mUpButtonContainer = findViewById(R.id.up_container);
-//
-//        mUpButton = findViewById(R.id.action_up);
-//        mUpButton.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                //TODO onSupportNavigateUp();
-//            }
-//        });
+    }
 
+    @Override
+    public void onBackPressed() {
 
+        // we need to clear out text to make the shared element transition work.
+        // why is it so much working around shared element transition
+        // adding it was the biggest mistake
+        // and 90% of this whole project's time
+        for(Map.Entry<Long, ArticleDetailFragment> entry : mFragments.entrySet()) {
+            Long id = entry.getKey();
+            ArticleDetailFragment frag = entry.getValue();
+            frag.clearText();
+        }
 
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-//            mUpButtonContainer.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
-//                @Override
-//                public WindowInsets onApplyWindowInsets(View view, WindowInsets windowInsets) {
-//                    view.onApplyWindowInsets(windowInsets);
-//                    mTopInset = windowInsets.getSystemWindowInsetTop();
-//                    mUpButtonContainer.setTranslationY(mTopInset);
-//                    updateUpButtonPosition();
-//                    return windowInsets;
-//                }
-//            });
-//        }
-
+        super.onBackPressed();
     }
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(EXTRA_CURRENT_POSITION, mSelectedPosition);
+        outState.putSerializable(TEXT_SCROLL_POSITION, IdToScrollY);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+
+        HashMap<Long,Integer> scrolls = (HashMap<Long, Integer>) savedInstanceState.getSerializable(TEXT_SCROLL_POSITION);
+        if (scrolls != null){
+            IdToScrollY = scrolls;
+        }
     }
 
     @Override
@@ -205,6 +327,13 @@ public class ArticleDetailActivity extends AppCompatActivity
                     mStartPosition = mCursor.getPosition();
                     mSelectedPosition = mStartPosition;
                     mPager.setCurrentItem(mStartPosition, false);
+
+                    mBarPicture.setTransitionName(mCursor.getString(ArticleLoader.Query.TITLE));
+                    Picasso.with(ArticleDetailActivity.this)
+                            .load(mCursor.getString(ArticleLoader.Query.PHOTO_URL))
+                            .placeholder(R.drawable.empty_detail)
+                            .noFade()
+                            .into(mBarPicture);
                     break;
                 }
                 mCursor.moveToNext();
@@ -221,7 +350,7 @@ public class ArticleDetailActivity extends AppCompatActivity
 
     public void onUpButtonFloorChanged(long itemId, ArticleDetailFragment fragment) {
         if (itemId == mSelectedItemId) {
-            mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
+//            mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
 //            updateUpButtonPosition();
         }
     }
@@ -241,7 +370,7 @@ public class ArticleDetailActivity extends AppCompatActivity
             super.setPrimaryItem(container, position, object);
             mDetailFragment = (ArticleDetailFragment) object;
             if (mDetailFragment != null) {
-                mSelectedItemUpButtonFloor = mDetailFragment.getUpButtonFloor();
+//                mSelectedItemUpButtonFloor = mDetailFragment.getUpButtonFloor();
 //                updateUpButtonPosition();
             }
         }

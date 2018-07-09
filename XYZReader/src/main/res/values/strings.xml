@@ -10,5 +10,6 @@
     <string name="up">Up</string>
 
     <string name="photo_transition">photo_transition</string>
+    <string name="not_available_string">N/A</string>
 
 </resources>

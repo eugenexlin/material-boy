@@ -17,7 +17,7 @@
 
 <resources>
 
-    <style name="Theme.Wasabi" parent="@style/Theme.AppCompat.Light.NoActionBar">
+    <style name="Theme.Wasabi" parent="Theme.AppCompat.DayNight.NoActionBar">
 
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primary_dark</item>

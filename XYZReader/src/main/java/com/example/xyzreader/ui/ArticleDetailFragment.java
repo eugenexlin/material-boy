@@ -22,6 +22,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ShareCompat;
+import android.support.v4.widget.NestedScrollView;
 import android.support.v7.graphics.Palette;
 import android.text.Html;
 import android.text.format.DateUtils;
@@ -52,22 +53,24 @@ public class ArticleDetailFragment extends Fragment implements
     public static final String ARG_ITEM_ID = "ARG_ITEM_ID";
     //before turning page
     public static final String ARG_NEEDS_TRANSITION = "ARG_NEEDS_TRANSITION";
+    public static final String ARG_DELAY_TEXT_LOAD = "ARG_DELAY_TEXT_LOAD";
     private static final float PARALLAX_FACTOR = 1.25f;
 
+
+    private boolean mFailedTextLoad = false;
     private Cursor mCursor;
+    private String mTextPreload;
     private long mItemId;
     private boolean mNeedsTransition;
+    private boolean mDelayTextLoad;
 
     private View mRootView;
+    private TextView mBodyView;
     private int mMutedColor = 0xFF333333;
-    private ObservableScrollView mScrollView;
-    private DrawInsetsFrameLayout mDrawInsetsFrameLayout;
+    public NestedScrollView mScrollView;
     private ColorDrawable mStatusBarColorDrawable;
 
-    private int mTopInset;
     private View mPhotoContainerView;
-    private ImageView mPhotoView;
-    private int mScrollY;
     private boolean mIsCard = false;
     private int mStatusBarFullOpacityBottom;
 
@@ -87,7 +90,7 @@ public class ArticleDetailFragment extends Fragment implements
     public static ArticleDetailFragment newInstance(long itemId, boolean needsTransition) {
         Bundle arguments = new Bundle();
         arguments.putLong(ARG_ITEM_ID, itemId);
-       arguments.putBoolean(ARG_NEEDS_TRANSITION, needsTransition);
+        arguments.putBoolean(ARG_NEEDS_TRANSITION, needsTransition);
         ArticleDetailFragment fragment = new ArticleDetailFragment();
         fragment.setArguments(arguments);
         return fragment;
@@ -104,6 +107,12 @@ public class ArticleDetailFragment extends Fragment implements
         }
         if (args.containsKey(ARG_NEEDS_TRANSITION)) {
             mNeedsTransition = args.getBoolean(ARG_NEEDS_TRANSITION);
+        }
+
+        getActivityCast().addFragment(mItemId, this);
+        if (mNeedsTransition) //!getActivityCast().isEnterTransitionFinished
+        {
+            getActivityCast().signMeUpForDelayedTextLoad(this);
         }
 
         mIsCard = getResources().getBoolean(R.bool.detail_is_card);
@@ -131,57 +140,24 @@ public class ArticleDetailFragment extends Fragment implements
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
         mRootView = inflater.inflate(R.layout.fragment_article_detail, container, false);
-        mDrawInsetsFrameLayout = (DrawInsetsFrameLayout)
-                mRootView.findViewById(R.id.draw_insets_frame_layout);
-        mDrawInsetsFrameLayout.setOnInsetsCallback(new DrawInsetsFrameLayout.OnInsetsCallback() {
-            @Override
-            public void onInsetsChanged(Rect insets) {
-                mTopInset = insets.top;
-            }
-        });
 
-        mScrollView = (ObservableScrollView) mRootView.findViewById(R.id.scrollview);
-        mScrollView.setCallbacks(new ObservableScrollView.Callbacks() {
-            @Override
-            public void onScrollChanged() {
-                mScrollY = mScrollView.getScrollY();
-                getActivityCast().onUpButtonFloorChanged(mItemId, ArticleDetailFragment.this);
-                mPhotoContainerView.setTranslationY((int) (mScrollY - mScrollY / PARALLAX_FACTOR));
-                updateStatusBar();
-            }
-        });
-
-        mPhotoView = (ImageView) mRootView.findViewById(R.id.photo);
-
-//        mPhotoView.setTransitionName("Ebooks, Neither E, Nor Books");
-//        Picasso.with(getActivity())
-//                .load("https://d17h27t6h515a5.cloudfront.net/topher/2017/March/58c5be60_ebooks/ebooks.jpg")
-//                .noFade()
-//                .into(mPhotoView, new Callback() {
-//                    @Override
-//                    public void onSuccess() {
-//                        startPostponedEnterTransition();
-//                    }
-//
-//                    @Override
-//                    public void onError() {
-//                        startPostponedEnterTransition();
-//                    }
-//                });
+        mScrollView = (NestedScrollView) mRootView.findViewById(R.id.scrollview);
 
         mPhotoContainerView = mRootView.findViewById(R.id.photo_container);
 
         mStatusBarColorDrawable = new ColorDrawable(0);
 
-        mRootView.findViewById(R.id.share_fab).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(Intent.createChooser(ShareCompat.IntentBuilder.from(getActivity())
-                        .setType("text/plain")
-                        .setText("Some sample text")
-                        .getIntent(), getString(R.string.action_share)));
-            }
-        });
+
+        //TODO FAB
+//        mRootView.findViewById(R.id.share_fab).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                startActivity(Intent.createChooser(ShareCompat.IntentBuilder.from(getActivity())
+//                        .setType("text/plain")
+//                        .setText("Some sample text")
+//                        .getIntent(), getString(R.string.action_share)));
+//            }
+//        });
 
         bindViews();
 
@@ -189,19 +165,72 @@ public class ArticleDetailFragment extends Fragment implements
         return mRootView;
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        clearText();
+        getActivityCast().removeFragment(mItemId);
+    }
+
+    //load the text after animation because it causes an inexplicable error
+    // when large texts are loaded. before
+    public void loadText(){
+
+        if (this.isDetached()){
+            return;
+        }
+
+        if (mTextPreload == null){
+            // goodness, the activity seemed to have RACED
+            // to get here before the text loaded????
+            if (mCursor == null){
+                // if we failed the race, then it triggers flag
+                // so on finish load cursor handler can load the text.
+                mFailedTextLoad = true;
+                return;
+            }else{
+                mTextPreload = mCursor.getString(ArticleLoader.Query.BODY);
+            }
+        }
+
+        if (mBodyView.getText().length() <= 10 && mBodyView.getText() == getString(R.string.not_available_string)) {
+            mBodyView.setText(Html.fromHtml(mTextPreload.replaceAll("(\r\n|\n)", "<br />")));
+        }
+    }
+
+    public void clearText(){
+        mBodyView.setVisibility(View.GONE);
+        //mBodyView.setText(getString(R.string.not_available_string));
+    }
+
+    // TODO well nested scroll view is something else.
+    public void saveScrollY(){
+        if (mScrollView != null) {
+            int scrollY = mScrollView.getScrollY();
+            getActivityCast().IdToScrollY.put(mItemId, scrollY);
+        }
+    }
+    public void loadScrollY(){
+        if (mScrollView != null && getActivityCast().IdToScrollY.containsKey(mItemId)) {
+            mScrollView.scrollTo(0, getActivityCast().IdToScrollY.get(mItemId));
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        saveScrollY();
+    }
+
     private void updateStatusBar() {
         int color = 0;
-        if (mPhotoView != null && mTopInset != 0 && mScrollY > 0) {
-            float f = progress(mScrollY,
-                    mStatusBarFullOpacityBottom - mTopInset * 3,
-                    mStatusBarFullOpacityBottom - mTopInset);
-            color = Color.argb((int) (255 * f),
-                    (int) (Color.red(mMutedColor) * 0.9),
-                    (int) (Color.green(mMutedColor) * 0.9),
-                    (int) (Color.blue(mMutedColor) * 0.9));
-        }
+
+        color = Color.argb(255,
+                (int) (Color.red(mMutedColor) * 0.9),
+                (int) (Color.green(mMutedColor) * 0.9),
+                (int) (Color.blue(mMutedColor) * 0.9));
         mStatusBarColorDrawable.setColor(color);
-        mDrawInsetsFrameLayout.setInsetBackground(mStatusBarColorDrawable);
+//        mDrawInsetsFrameLayout.setInsetBackground(mStatusBarColorDrawable);
     }
 
     static float progress(float v, float min, float max) {
@@ -237,17 +266,16 @@ public class ArticleDetailFragment extends Fragment implements
         TextView titleView = (TextView) mRootView.findViewById(R.id.article_title);
         TextView bylineView = (TextView) mRootView.findViewById(R.id.article_byline);
         bylineView.setMovementMethod(new LinkMovementMethod());
-        TextView bodyView = (TextView) mRootView.findViewById(R.id.article_body);
+        mBodyView = (TextView) mRootView.findViewById(R.id.article_body);
 
 
-        bodyView.setTypeface(Typeface.createFromAsset(getResources().getAssets(), "Rosario-Regular.ttf"));
+        mBodyView.setTypeface(Typeface.createFromAsset(getResources().getAssets(), "Rosario-Regular.ttf"));
 
         if (mCursor != null) {
             mRootView.setAlpha(0);
             mRootView.setVisibility(View.VISIBLE);
             mRootView.animate().alpha(1);
             titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
-            mPhotoView.setTransitionName(mCursor.getString(ArticleLoader.Query.TITLE));
 
             Date publishedDate = parsePublishedDate();
             if (!publishedDate.before(START_OF_EPOCH.getTime())) {
@@ -268,39 +296,19 @@ public class ArticleDetailFragment extends Fragment implements
                                 + "</font>"));
 
             }
-//            bodyView.setText(Html.fromHtml(mCursor.getString(ArticleLoader.Query.BODY).replaceAll("(\r\n|\n)", "<br />")));
 
-            bodyView.setText(
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "THIS IS A TEST\n" +
-                    "");
+            mTextPreload = mCursor.getString(ArticleLoader.Query.BODY);
+            if (mFailedTextLoad || getActivityCast().isEnterTransitionFinished){
+                mFailedTextLoad = false;
+                loadText();
+            }
+
+            loadScrollY();
 
             final Target imageTarget = new Target() {
                 @Override
                 public void onBitmapLoaded(Bitmap bitmap, Picasso.LoadedFrom from) {
                     if (bitmap != null) {
-                        mPhotoView.setImageBitmap(bitmap);
                         Palette p = Palette.generate(bitmap, 12);
                         mMutedColor = p.getDarkMutedColor(0xFF333333);
                         mRootView.findViewById(R.id.meta_bar)
@@ -328,34 +336,24 @@ public class ArticleDetailFragment extends Fragment implements
 
         } else {
             mRootView.setVisibility(View.GONE);
-            titleView.setText("N/A");
-            bylineView.setText("N/A" );
-            bodyView.setText("N/A");
+            titleView.setText(getString(R.string.not_available_string));
+            bylineView.setText(getString(R.string.not_available_string));
+            mBodyView.setText(getString(R.string.not_available_string));
         }
     }
 
-
     private void startPostponedEnterTransition() {
         if (mNeedsTransition) {
-            mPhotoView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            getActivityCast().mBarPicture.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
                 @Override
                 public boolean onPreDraw() {
-                    mPhotoView.getViewTreeObserver().removeOnPreDrawListener(this);
+                    getActivityCast().mBarPicture.getViewTreeObserver().removeOnPreDrawListener(this);
                     getActivity().startPostponedEnterTransition();
                     return true;
                 }
             });
-        }
-    }
 
-    @Nullable
-    ImageView getImageView(){
-        Rect scrollBounds = new Rect();
-        mScrollView.getHitRect(scrollBounds);
-        if (mPhotoView.getLocalVisibleRect(scrollBounds)){
-            return mPhotoView;
         }
-        return null;
     }
 
     @Override
@@ -380,22 +378,12 @@ public class ArticleDetailFragment extends Fragment implements
         }
 
         bindViews();
+
     }
 
     @Override
     public void onLoaderReset(Loader<Cursor> cursorLoader) {
         mCursor = null;
         bindViews();
-    }
-
-    public int getUpButtonFloor() {
-        if (mPhotoContainerView == null || mPhotoView.getHeight() == 0) {
-            return Integer.MAX_VALUE;
-        }
-
-        // account for parallax
-        return mIsCard
-                ? (int) mPhotoContainerView.getTranslationY() + mPhotoView.getHeight() - mScrollY
-                : mPhotoView.getHeight() - mScrollY;
     }
 }

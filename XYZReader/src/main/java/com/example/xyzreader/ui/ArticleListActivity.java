@@ -59,7 +59,6 @@ public class ArticleListActivity extends Activity implements
 
     private static final String TAG = ArticleListActivity.class.toString();
     private Toolbar mToolbar;
-    private CollapsingToolbarLayout mCTL;
     private SwipeRefreshLayout mSwipeRefreshLayout;
     private RecyclerView mRecyclerView;
 //    private ProgressBar mLoading;
@@ -123,7 +122,6 @@ public class ArticleListActivity extends Activity implements
 
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
 //        final View toolbarContainerView = findViewById(R.id.toolbar_container);
-        mCTL = (CollapsingToolbarLayout) findViewById(R.id.collapsing_toolbar);
 
 //        mLoading = (ProgressBar) findViewById(R.id.loading);
 
@@ -270,7 +268,6 @@ public class ArticleListActivity extends Activity implements
                 long currentTime = System.currentTimeMillis();
                 long nextAnimationTime = lastAnimationTime + animationDelayMs;
                 long actualAnimationTime = (nextAnimationTime > currentTime ? nextAnimationTime : currentTime);
-                System.out.println(actualAnimationTime);
                 Animation animation = AnimationUtils.loadAnimation(mActivity, R.anim.item_fall_in_anim);
                 lastAnimationTime = actualAnimationTime;
                 if (actualAnimationTime > currentTime){
@@ -343,7 +340,7 @@ public class ArticleListActivity extends Activity implements
 
             Picasso.with(mActivity)
                     .load(cursor.getString(ArticleLoader.Query.PHOTO_URL))
-                    .noFade()
+                    .placeholder(R.drawable.empty_detail)
                     .into(thumbnailView);
 
         }

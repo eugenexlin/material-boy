@@ -24,9 +24,7 @@
             android:paddingRight="@dimen/list_side_margin"
             android:paddingBottom="28dp"
             />
-        <!--
-            android:layoutAnimation="@anim/item_fall_in_layout_anim"
-            -->
+
     </android.support.v4.widget.SwipeRefreshLayout>
 
     <android.support.design.widget.AppBarLayout
@@ -53,48 +51,6 @@
 
         </android.support.v7.widget.Toolbar>
 
-        <!--<android.support.design.widget.CollapsingToolbarLayout-->
-            <!--android:id="@+id/collapsing_toolbar"-->
-            <!--android:layout_width="match_parent"-->
-            <!--android:layout_height="match_parent"-->
-            <!--android:fitsSystemWindows="true"-->
-            <!--app:layout_scrollFlags="scroll|exitUntilCollapsed"-->
-            <!--app:contentScrim="?attr/colorPrimary">-->
-
-        <!--</android.support.design.widget.CollapsingToolbarLayout>-->
-
     </android.support.design.widget.AppBarLayout>
 
-    <!--<ProgressBar-->
-        <!--android:id="@+id/loading"-->
-        <!--android:layout_width="@dimen/loader_size"-->
-        <!--android:layout_height="@dimen/loader_size"-->
-        <!--android:layout_gravity="center"/>-->
-
-    <!--
-    <FrameLayout
-        android:id="@+id/toolbar_container"
-        android:layout_width="match_parent"
-        android:layout_height="112dp"
-        android:background="?colorPrimary"
-        android:elevation="8dp">
-
-        <android.support.v7.widget.Toolbar
-            android:id="@+id/toolbar"
-            app:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-            android:layout_marginLeft="@dimen/list_toolbar_side_margin"
-            android:layout_marginRight="@dimen/list_toolbar_side_margin"
-            android:layout_width="match_parent"
-            android:layout_height="?actionBarSize"
-            android:layout_gravity="bottom">
-
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:src="@drawable/logo"
-                android:contentDescription="@string/app_name" />
-
-        </android.support.v7.widget.Toolbar>
-    </FrameLayout>
-    -->
 </android.support.design.widget.CoordinatorLayout>
