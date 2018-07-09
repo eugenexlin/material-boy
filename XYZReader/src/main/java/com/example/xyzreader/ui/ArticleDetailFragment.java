@@ -2,12 +2,10 @@ package com.example.xyzreader.ui;
 
 import android.app.Fragment;
 import android.app.LoaderManager;
-import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 
@@ -20,8 +18,6 @@ import java.util.GregorianCalendar;
 
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.app.ShareCompat;
 import android.support.v4.widget.NestedScrollView;
 import android.support.v7.graphics.Palette;
 import android.text.Html;
@@ -32,13 +28,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.squareup.picasso.Target;
-
 
 /**
  * A fragment representing a single Article detail screen. This fragment is
@@ -53,32 +47,30 @@ public class ArticleDetailFragment extends Fragment implements
     public static final String ARG_ITEM_ID = "ARG_ITEM_ID";
     //before turning page
     public static final String ARG_NEEDS_TRANSITION = "ARG_NEEDS_TRANSITION";
-    public static final String ARG_DELAY_TEXT_LOAD = "ARG_DELAY_TEXT_LOAD";
-    private static final float PARALLAX_FACTOR = 1.25f;
-
 
     private boolean mFailedTextLoad = false;
     private Cursor mCursor;
     private String mTextPreload;
     private long mItemId;
     private boolean mNeedsTransition;
-    private boolean mDelayTextLoad;
 
     private View mRootView;
     private TextView mBodyView;
+    private TextView mTitleView;
+    private String mAuthor;
     private int mMutedColor = 0xFF333333;
     public NestedScrollView mScrollView;
     private ColorDrawable mStatusBarColorDrawable;
-
-    private View mPhotoContainerView;
-    private boolean mIsCard = false;
-    private int mStatusBarFullOpacityBottom;
 
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss");
     // Use default locale format
     private SimpleDateFormat outputFormat = new SimpleDateFormat();
     // Most time functions can only handle 1902 - 2037
     private GregorianCalendar START_OF_EPOCH = new GregorianCalendar(2,1,1);
+
+    public String getShareText(){
+        return "I am reading " + mTitleView.getText() + " by " + mAuthor + ", and it is great!";
+    }
 
     /**
      * Mandatory empty constructor for the fragment manager to instantiate the
@@ -115,9 +107,6 @@ public class ArticleDetailFragment extends Fragment implements
             getActivityCast().signMeUpForDelayedTextLoad(this);
         }
 
-        mIsCard = getResources().getBoolean(R.bool.detail_is_card);
-        mStatusBarFullOpacityBottom = getResources().getDimensionPixelSize(
-                R.dimen.detail_card_top_margin);
         setHasOptionsMenu(true);
     }
 
@@ -143,21 +132,7 @@ public class ArticleDetailFragment extends Fragment implements
 
         mScrollView = (NestedScrollView) mRootView.findViewById(R.id.scrollview);
 
-        mPhotoContainerView = mRootView.findViewById(R.id.photo_container);
-
         mStatusBarColorDrawable = new ColorDrawable(0);
-
-
-        //TODO FAB
-//        mRootView.findViewById(R.id.share_fab).setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                startActivity(Intent.createChooser(ShareCompat.IntentBuilder.from(getActivity())
-//                        .setType("text/plain")
-//                        .setText("Some sample text")
-//                        .getIntent(), getString(R.string.action_share)));
-//            }
-//        });
 
         bindViews();
 
@@ -203,7 +178,6 @@ public class ArticleDetailFragment extends Fragment implements
         //mBodyView.setText(getString(R.string.not_available_string));
     }
 
-    // TODO well nested scroll view is something else.
     public void saveScrollY(){
         if (mScrollView != null) {
             int scrollY = mScrollView.getScrollY();
@@ -263,7 +237,7 @@ public class ArticleDetailFragment extends Fragment implements
             return;
         }
 
-        TextView titleView = (TextView) mRootView.findViewById(R.id.article_title);
+        mTitleView = (TextView) mRootView.findViewById(R.id.article_title);
         TextView bylineView = (TextView) mRootView.findViewById(R.id.article_byline);
         bylineView.setMovementMethod(new LinkMovementMethod());
         mBodyView = (TextView) mRootView.findViewById(R.id.article_body);
@@ -275,7 +249,8 @@ public class ArticleDetailFragment extends Fragment implements
             mRootView.setAlpha(0);
             mRootView.setVisibility(View.VISIBLE);
             mRootView.animate().alpha(1);
-            titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
+            mTitleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
+            mAuthor = mCursor.getString(ArticleLoader.Query.AUTHOR);
 
             Date publishedDate = parsePublishedDate();
             if (!publishedDate.before(START_OF_EPOCH.getTime())) {
@@ -285,7 +260,7 @@ public class ArticleDetailFragment extends Fragment implements
                                 System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
                                 DateUtils.FORMAT_ABBREV_ALL).toString()
                                 + " by <font color='#ffffff'>"
-                                + mCursor.getString(ArticleLoader.Query.AUTHOR)
+                                + mAuthor
                                 + "</font>"));
 
             } else {
@@ -336,7 +311,7 @@ public class ArticleDetailFragment extends Fragment implements
 
         } else {
             mRootView.setVisibility(View.GONE);
-            titleView.setText(getString(R.string.not_available_string));
+            mTitleView.setText(getString(R.string.not_available_string));
             bylineView.setText(getString(R.string.not_available_string));
             mBodyView.setText(getString(R.string.not_available_string));
         }

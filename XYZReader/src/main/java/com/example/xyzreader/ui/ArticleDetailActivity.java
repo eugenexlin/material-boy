@@ -1,6 +1,5 @@
 package com.example.xyzreader.ui;
 
-import android.annotation.SuppressLint;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.LoaderManager;
@@ -8,28 +7,22 @@ import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
 import android.graphics.drawable.ColorDrawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.AppBarLayout;
-import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v13.app.FragmentStatePagerAdapter;
 import android.app.SharedElementCallback;
+import android.support.v4.app.ShareCompat;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.transition.Transition;
-import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowInsets;
-import android.view.WindowManager;
 import android.widget.ImageView;
-
-
 
 import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
@@ -37,10 +30,8 @@ import com.example.xyzreader.data.ItemsContract;
 import com.squareup.picasso.Picasso;
 
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 
 import static com.example.xyzreader.ui.ArticleListActivity.EXTRA_CURRENT_POSITION;
 import static com.example.xyzreader.ui.ArticleListActivity.EXTRA_STARTING_POSITION;
@@ -185,6 +176,21 @@ public class ArticleDetailActivity extends AppCompatActivity
         mBarPicture= (ImageView) findViewById(R.id.backdrop);
 
         mFAB = (FloatingActionButton) findViewById(R.id.fab_share);
+        mFAB.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String text = mFragments.get(mSelectedItemId).getShareText();
+                startActivity(Intent.createChooser(ShareCompat.IntentBuilder
+                        .from(ArticleDetailActivity.this)
+                    .setType("text/plain")
+                    .setText(text)
+                    .getIntent(), getString(R.string.action_share)));
+                // TODO FAB there is probably some way to
+                // generate a link to force you to download the app
+                // and then this would just send that intent URL link
+                // that would open the article detail activity directly.
+            }
+        });
 
         mAppBar = (AppBarLayout) findViewById(R.id.appbar);
         mAppBar.addOnOffsetChangedListener(new AppBarLayout.OnOffsetChangedListener() {
@@ -241,9 +247,6 @@ public class ArticleDetailActivity extends AppCompatActivity
             @Override
             public void onPageScrollStateChanged(int state) {
                 super.onPageScrollStateChanged(state);
-//               mUpButton.animate()
-//                        .alpha((state == ViewPager.SCROLL_STATE_IDLE) ? 1f : 0f)
-//                        .setDuration(300);
             }
 
             @Override
@@ -348,18 +351,6 @@ public class ArticleDetailActivity extends AppCompatActivity
         mPagerAdapter.notifyDataSetChanged();
     }
 
-    public void onUpButtonFloorChanged(long itemId, ArticleDetailFragment fragment) {
-        if (itemId == mSelectedItemId) {
-//            mSelectedItemUpButtonFloor = fragment.getUpButtonFloor();
-//            updateUpButtonPosition();
-        }
-    }
-
-//    private void updateUpButtonPosition() {
-//        int upButtonNormalBottom = mTopInset + mUpButton.getHeight();
-//        mUpButton.setTranslationY(Math.min(mSelectedItemUpButtonFloor - upButtonNormalBottom, 0));
-//    }
-
     private class MyPagerAdapter extends FragmentStatePagerAdapter {
         public MyPagerAdapter(FragmentManager fm) {
             super(fm);
@@ -370,8 +361,7 @@ public class ArticleDetailActivity extends AppCompatActivity
             super.setPrimaryItem(container, position, object);
             mDetailFragment = (ArticleDetailFragment) object;
             if (mDetailFragment != null) {
-//                mSelectedItemUpButtonFloor = mDetailFragment.getUpButtonFloor();
-//                updateUpButtonPosition();
+
             }
         }
 
