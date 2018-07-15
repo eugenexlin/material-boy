@@ -220,13 +220,6 @@ public class ArticleDetailActivity extends AppCompatActivity
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
-        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                onBackPressed();
-            }
-        });
 
         if (savedInstanceState == null) {
             if (getIntent() != null && getIntent().getData() != null) {
